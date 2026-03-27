@@ -33,9 +33,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
+    if (!process.env.MINIMAX_API_KEY) {
       return new Response(
-        JSON.stringify({ error: '未設定 ANTHROPIC_API_KEY 環境變數' }),
+        JSON.stringify({ error: '未設定 MINIMAX_API_KEY 環境變數' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
