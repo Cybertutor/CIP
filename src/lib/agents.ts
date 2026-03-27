@@ -1,12 +1,13 @@
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import type { Agent, Message } from './types';
 
-// Initialize Anthropic client
-export const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+// Initialize MiniMax client (OpenAI-compatible API)
+export const openai = new OpenAI({
+  apiKey: process.env.MINIMAX_API_KEY,
+  baseURL: 'https://api.minimax.chat/v1',
 });
 
-export const MODEL = 'claude-opus-4-5';
+export const MODEL = 'MiniMax-Text-01';
 
 // Agent configurations
 export const AGENTS: Record<string, Agent> = {
@@ -97,7 +98,7 @@ export async function* streamPMConversation(
 ): AsyncGenerator<string> {
   const agent = AGENTS.pm;
 
-  const formattedMessages = messages.map((m) => ({
+  const formattedMessages: OpenAI.ChatCompletionMessageParam[] = messages.map((m) => ({
     role: m.role as 'user' | 'assistant',
     content: m.content,
   }));
@@ -110,20 +111,19 @@ export async function* streamPMConversation(
     });
   }
 
-  const stream = anthropic.messages.stream({
+  const stream = await openai.chat.completions.create({
     model: MODEL,
     max_tokens: 4096,
-    system: agent.systemPrompt,
-    messages: formattedMessages,
+    stream: true,
+    messages: [
+      { role: 'system', content: agent.systemPrompt },
+      ...formattedMessages,
+    ],
   });
 
   for await (const chunk of stream) {
-    if (
-      chunk.type === 'content_block_delta' &&
-      chunk.delta.type === 'text_delta'
-    ) {
-      yield chunk.delta.text;
-    }
+    const content = chunk.choices[0]?.delta?.content;
+    if (content) yield content;
   }
 }
 
@@ -139,25 +139,19 @@ export async function* streamAgentResponse(
     throw new Error(`Unknown agent: ${agentId}`);
   }
 
-  const stream = anthropic.messages.stream({
+  const stream = await openai.chat.completions.create({
     model: MODEL,
     max_tokens: 8192,
-    system: agent.systemPrompt,
+    stream: true,
     messages: [
-      {
-        role: 'user',
-        content: userPrompt,
-      },
+      { role: 'system', content: agent.systemPrompt },
+      { role: 'user', content: userPrompt },
     ],
   });
 
   for await (const chunk of stream) {
-    if (
-      chunk.type === 'content_block_delta' &&
-      chunk.delta.type === 'text_delta'
-    ) {
-      yield chunk.delta.text;
-    }
+    const content = chunk.choices[0]?.delta?.content;
+    if (content) yield content;
   }
 }
 
